@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Generative Organism</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; background: #050508; font-family: monospace; color: #eee; overflow: hidden; }
+    #app { display: flex; flex-direction: column; height: 100dvh; }
+
+    /* Top bar */
+    #topbar {
+      display: flex; align-items: center; gap: 4px; flex-wrap: nowrap;
+      padding: 6px 12px; background: #0a0a0f;
+      border-bottom: 1px solid #1a1a2e; flex-shrink: 0;
+      overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+    }
+    #topbar::-webkit-scrollbar { display: none; }
+
+    .tb-section { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .tb-label { font-size: 9px; color: #556; letter-spacing: 0.12em; margin-right: 2px; white-space: nowrap; font-weight: bold; }
+    .tb-sep { width: 1px; height: 16px; background: #1a1a2e; margin: 0 5px; flex-shrink: 0; }
+
+    .btn {
+      padding: 4px 9px; border: 1px solid; background: #0d0d14;
+      cursor: pointer; font-family: monospace; font-size: 10px;
+      border-radius: 3px; transition: all 0.12s; white-space: nowrap; letter-spacing: 0.04em;
+    }
+    .btn:hover { filter: brightness(1.4); }
+
+    .btn-spawn { color: #5599aa; border-color: #1a3340; }
+    .btn-spawn:hover { border-color: #5599aa; background: #0d1f28; }
+    .btn-spawn.active { border-color: #4ecdc4; color: #4ecdc4; background: #071110; box-shadow: 0 0 8px #4ecdc444; }
+
+    .btn-math { color: #557766; border-color: #1a2e22; font-size: 9px; }
+    .btn-math:hover { border-color: #557766; background: #0d1a12; }
+    .btn-math.active { border-color: #44aa66; color: #44aa66; background: #071010; }
+
+    .btn-action { color: #889; border-color: #223; font-size: 10px; }
+    .btn-action:hover { border-color: #667; color: #ccd; }
+
+    .btn-add { color: #4ecdc4; border-color: #1a3340; font-size: 11px; font-weight: bold; padding: 4px 10px; margin-left: 3px; }
+    .btn-add:hover { border-color: #4ecdc4; background: #071110; }
+
+    .btn-cam { color: #aa88cc; border-color: #3a2255; font-size: 10px; }
+    .btn-cam.active { border-color: #aa66ff; color: #cc88ff; background: #110a1a; box-shadow: 0 0 8px #aa66ff44; }
+
+    .pal-dot {
+      width: 14px; height: 14px; border-radius: 50%; border: 2px solid transparent;
+      cursor: pointer; flex-shrink: 0; transition: all 0.12s;
+    }
+    .pal-dot:hover { transform: scale(1.2); border-color: rgba(255,255,255,0.5); }
+    .pal-dot.active { border-color: #fff; transform: scale(1.2); }
+
+    /* Canvas area */
+    #canvas-wrap { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+    #canvas-wrap canvas { display: block; }
+
+    /* Controls panel */
+    #ctrl-panel {
+      background: #0a0a0f; border-top: 1px solid #1a1a2e;
+      flex-shrink: 0; transition: max-height 0.3s ease, opacity 0.3s ease;
+      max-height: 0; opacity: 0; overflow: hidden; padding: 0 14px;
+    }
+    #ctrl-panel.open { max-height: 240px; opacity: 1; padding: 10px 14px; }
+
+    .ctrl-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .ctrl-typename { font-size: 11px; color: #4ecdc4; letter-spacing: 0.12em; font-weight: bold; }
+    .ctrl-pal-row { display: flex; gap: 5px; align-items: center; margin-left: 8px; }
+    .ctrl-remove {
+      margin-left: auto; padding: 3px 10px; border: 1px solid #442233;
+      background: #150a10; color: #cc4466; font-family: monospace; font-size: 10px;
+      border-radius: 3px; cursor: pointer; transition: all 0.12s;
+    }
+    .ctrl-remove:hover { border-color: #cc4466; background: #220a12; }
+
+    .ctrl-sliders { display: flex; flex-wrap: wrap; gap: 6px 14px; overflow-y: auto; max-height: 160px; }
+    .slider-group { display: flex; align-items: center; gap: 6px; min-width: 160px; }
+    .slider-group label { font-size: 9px; color: #778; min-width: 64px; letter-spacing: 0.06em; }
+    .slider-group input[type=range] {
+      -webkit-appearance: none; width: 90px; height: 3px;
+      background: #1a2a3a; border-radius: 2px; outline: none; cursor: pointer;
+    }
+    .slider-group input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 10px; height: 10px;
+      border-radius: 50%; background: #4ecdc4; cursor: pointer;
+    }
+    .slider-group .slider-val { font-size: 9px; color: #556; min-width: 36px; }
+
+    /* Info modal */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75); z-index: 100; align-items: center; justify-content: center;
+    }
+    #modal-overlay.open { display: flex; }
+    #modal-box {
+      background: #0d0d18; border: 1px solid #1a1a2e; border-radius: 6px;
+      padding: 28px 32px; max-width: 480px; width: 90%; max-height: 80vh; overflow-y: auto;
+    }
+    #modal-box h2 { font-size: 16px; color: #4ecdc4; letter-spacing: 0.2em; margin-bottom: 4px; }
+    #modal-box .tagline { font-size: 11px; color: #557; margin-bottom: 18px; letter-spacing: 0.1em; }
+    #modal-box p { font-size: 12px; color: #99a; line-height: 1.6; margin-bottom: 12px; }
+    #modal-box h3 { font-size: 10px; color: #4ecdc4; letter-spacing: 0.15em; margin: 14px 0 6px; }
+    #modal-box ul { list-style: none; font-size: 11px; color: #778; line-height: 1.8; }
+    #modal-box ul li::before { content: '▸ '; color: #4ecdc4; }
+    #modal-box a { color: #4ecdc4; text-decoration: none; }
+    #modal-box a:hover { text-decoration: underline; }
+    #modal-close {
+      margin-top: 18px; padding: 6px 18px; border: 1px solid #1a3340;
+      background: #0d1f28; color: #4ecdc4; font-family: monospace; font-size: 11px;
+      border-radius: 3px; cursor: pointer; transition: all 0.12s;
+    }
+    #modal-close:hover { border-color: #4ecdc4; }
+
+    /* Render progress indicator */
+    #render-bar {
+      position: fixed; top: 34px; left: 0; height: 2px;
+      background: linear-gradient(90deg, #4ecdc4, #aa66ff);
+      transition: width 0.1s; z-index: 10; pointer-events: none;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    #render-bar.active { opacity: 1; }
+
+    @media (max-width: 600px) {
+      .tb-section.math-section { display: none; }
+      .btn { font-size: 9px; padding: 3px 7px; }
+      #ctrl-panel {
+        position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+        border-top: 1px solid #2a2a4e;
+        max-height: 0 !important; opacity: 0 !important;
+      }
+      #ctrl-panel.open { max-height: 280px !important; opacity: 1 !important; padding: 10px 14px !important; }
+      .slider-group input[type=range] { width: 120px; height: 20px; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="tb-section">
+      <span class="tb-label">TYPE</span>
+      <button class="btn btn-spawn" data-type="ORGANISM">ORGANISM</button>
+      <button class="btn btn-spawn" data-type="MEDUSA-X">MEDUSA-X</button>
+      <button class="btn btn-spawn" data-type="CTENOPHORA">CTENOPHORA</button>
+      <button class="btn btn-spawn" data-type="SIPHON">SIPHON</button>
+      <button class="btn btn-spawn" data-type="RADIOLARIA">RADIOLARIA</button>
+      <button class="btn btn-spawn" data-type="BIOLUME">BIOLUME</button>
+      <button class="btn btn-spawn" data-type="NAUTILOID">NAUTILOID</button>
+      <button class="btn btn-spawn" data-type="XENOCORAL">XENOCORAL</button>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-section math-section">
+      <span class="tb-label">MATH</span>
+      <button class="btn btn-math" data-type="MANDELBROT">MANDELBROT</button>
+      <button class="btn btn-math" data-type="JULIA">JULIA</button>
+      <button class="btn btn-math" data-type="LISSAJOUS">LISSAJOUS</button>
+      <button class="btn btn-math" data-type="CLIFFORD">CLIFFORD</button>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-section" id="pal-dots-top">
+      <span class="tb-label">COLOR</span>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-section">
+      <button class="btn btn-cam" id="btn-3d">3D OFF</button>
+      <button class="btn btn-action" id="btn-info">?</button>
+      <button class="btn btn-action" id="btn-reset">RESET</button>
+    </div>
+  </div>
+
+  <div id="canvas-wrap"></div>
+
+  <div id="ctrl-panel">
+    <div class="ctrl-header">
+      <span class="ctrl-typename" id="ctrl-typename">ORGANISM</span>
+      <div class="ctrl-pal-row" id="ctrl-pal-dots"></div>
+      <button class="ctrl-remove" id="ctrl-remove">REMOVE</button>
+    </div>
+    <div class="ctrl-sliders" id="ctrl-sliders"></div>
+  </div>
+</div>
+
+<div id="render-bar"></div>
+
+<div id="modal-overlay">
+  <div id="modal-box">
+    <h2>GENERATIVE ORGANISM</h2>
+    <div class="tagline">an aquarium of mathematical life</div>
+    <p>Each creature is a unique mathematical attractor — thousands of points orbiting through equations.</p>
+    <h3>HOW TO USE</h3>
+    <ul>
+      <li><strong>TYPE</strong> — switch current creature to a new type</li>
+      <li><strong>+ADD</strong> — spawn additional creature alongside</li>
+      <li><strong>3D OFF/ON</strong> — toggle slow auto-rotate; scroll/pinch to zoom</li>
+      <li><strong>TAP CREATURE</strong> — open its controls</li>
+      <li><strong>COLOR</strong> — changes the current creature's palette instantly</li>
+      <li><strong>MANDELBROT</strong> — double-click anywhere to zoom in; renders progressively</li>
+    </ul>
+    <h3>INSPIRATION</h3>
+    <p><a href="https://www.instagram.com/josephinemiller/" target="_blank" rel="noopener">Josephine Miller</a></p>
+    <button id="modal-close">CLOSE</button>
+  </div>
+</div>
+
+<script>
+// ─── Palettes ────────────────────────────────────────────────────────────────
+const PALETTES = {
+  'Vibrant':    (v,t) => [(v*360+t*12)%360, 95, 100],
+  'Synthwave':  (v,t) => { const h=(300+Math.sin(v*Math.PI*3+t*0.2)*80+360)%360; return [h,100,55+v*45]; },
+  'Inferno':    (v,t) => [v*55, 100, 35+v*65],
+  'Acid':       (v,t) => [(v*540+t*55)%360, 100, 100],
+  'Neon City':  (v,t) => [v>0.5?174:310, 100, 70+v*30],
+  'Aurora':     (v,t) => [110+v*140, 65+v*25, 45+v*55],
+  'Deep Space': (v,t) => { const br=v>0.88?100:15+v*35; return [215+v*50,75,br]; },
+  'Lava':       (v,t) => [v*38, 100, 20+v*80],
+  'Ice':        (v,t) => [195+v*30, 20+v*50, 60+v*40],
+  'Mono':       (v,t) => [0, 0, Math.pow(v,0.6)*100],
+  'Biolume':    (v,t) => [170+v*60, 80+v*20, 40+v*60],
+  'Abyssal':    (v,t) => [220+v*40, 70, v>0.85?90:5+v*25],
+  'Coral Sea':  (v,t) => [(v*120+330)%360, 80+v*20, 50+v*50],
+};
+const PAL_KEYS = Object.keys(PALETTES);
+const PAL_SWATCHES = {
+  'Vibrant':'#ff6b6b','Synthwave':'#da77ff','Inferno':'#ff7b00',
+  'Acid':'#ccff00','Neon City':'#00ffcc','Aurora':'#57cc99',
+  'Deep Space':'#4488ff','Lava':'#cc2200','Ice':'#aaddff','Mono':'#888',
+  'Biolume':'#00e5cc','Abyssal':'#0044aa','Coral Sea':'#ff88aa',
+};
+
+// ─── HSB → RGB helper (for pixel-level fractal rendering) ────────────────────
+function hsbToRgb(h, s, v) {
+  const i = Math.floor(h * 6);
+  const f = h * 6 - i, p = v*(1-s), q = v*(1-f*s), t2 = v*(1-(1-f)*s);
+  let r, g, b;
+  switch(i % 6){
+    case 0: r=v;g=t2;b=p; break; case 1: r=q;g=v;b=p; break;
+    case 2: r=p;g=v;b=t2; break; case 3: r=p;g=q;b=v; break;
+    case 4: r=t2;g=p;b=v; break; case 5: r=v;g=p;b=q; break;
+    default: r=0;g=0;b=0;
+  }
+  return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+}
+
+// ─── Common defaults shared across all attractor creatures ───────────────────
+const C = {
+  points:4000, speed:0.05, opacity:90, weight:1, trail:8,
+  scale:0.75, glow:0, color_speed:1, spin:0, hue_shift:0, symmetry:1,
+  k_amp:5, x_freq:14, y_freq:30, e_scale:8, e_offset:13,
+  d_denom:59, d_offset:4, q_base:160, q_twist:3,
+  wave_amp:3, wave_ripple:4, d_y:9, squeeze:1, t_div:18
+};
+
+const COMMON_SLIDERS = [
+  { k:'points',      label:'DENSITY',   min:500,  max:8000,  step:100 },
+  { k:'speed',       label:'SPEED',     min:0,    max:0.2,   step:0.001 },
+  { k:'scale',       label:'SIZE',      min:0.1,  max:3,     step:0.05 },
+  { k:'opacity',     label:'OPACITY',   min:10,   max:255,   step:1 },
+  { k:'glow',        label:'GLOW',      min:0,    max:8,     step:1 },
+  { k:'weight',      label:'WEIGHT',    min:0.5,  max:4,     step:0.1 },
+  { k:'trail',       label:'TRAIL',     min:2,    max:120,   step:1 },
+  { k:'color_speed', label:'CLR SPD',   min:0,    max:2,     step:0.05 },
+  { k:'spin',        label:'SPIN',      min:-0.05,max:0.05,  step:0.001 },
+  { k:'hue_shift',   label:'HUE',       min:0,    max:360,   step:1 },
+  { k:'symmetry',    label:'SYMMETRY',  min:1,    max:8,     step:1 },
+];
+const ATTRACTOR_SLIDERS = [
+  { k:'k_amp',       label:'K AMP',     min:0.5,  max:20,    step:0.1 },
+  { k:'x_freq',      label:'X FREQ',    min:1,    max:50,    step:0.5 },
+  { k:'y_freq',      label:'Y FREQ',    min:1,    max:60,    step:0.5 },
+  { k:'q_base',      label:'RADIUS',    min:20,   max:320,   step:1 },
+  { k:'q_twist',     label:'TWIST',     min:0,    max:16,    step:0.1 },
+  { k:'wave_amp',    label:'WAVE',      min:0,    max:30,    step:0.1 },
+  { k:'wave_ripple', label:'RIPPLE',    min:0,    max:12,    step:0.1 },
+  { k:'d_y',         label:'DEPTH',     min:1,    max:22,    step:0.1 },
+  { k:'squeeze',     label:'SQUEEZE',   min:0.1,  max:2,     step:0.05 },
+  { k:'t_div',       label:'T DIV',     min:4,    max:40,    step:0.5 },
+];
+
+// ─── Type definitions ────────────────────────────────────────────────────────
+const TYPE_DEFS = {
+  // ── ORGANISM: orbital parametric (original) ──────────────────────────────
+  'ORGANISM': {
+    defaults: { ...C },
+    sliders: [...COMMON_SLIDERS, ...ATTRACTOR_SLIDERS]
+  },
+  // ── MEDUSA-X: flat petal/rose — low d_y, squeeze, high q_twist ───────────
+  'MEDUSA-X': {
+    defaults: { ...C, k_amp:8, x_freq:6, y_freq:18, e_scale:15, e_offset:4,
+      d_denom:35, d_offset:3, q_base:150, q_twist:6, wave_amp:10, wave_ripple:6,
+      d_y:4, squeeze:0.55, t_div:12, speed:0.04 },
+    sliders: [...COMMON_SLIDERS, ...ATTRACTOR_SLIDERS]
+  },
+  // ── CTENOPHORA: elongated ribbon — high d_y, low squeeze ─────────────────
+  'CTENOPHORA': {
+    defaults: { ...C, k_amp:3, x_freq:22, y_freq:4, e_scale:4, e_offset:25,
+      d_denom:45, d_offset:5, q_base:90, q_twist:1, wave_amp:15, wave_ripple:3,
+      d_y:20, squeeze:0.3, t_div:15 },
+    sliders: [...COMMON_SLIDERS, ...ATTRACTOR_SLIDERS]
+  },
+  // ── SIPHON: spiral chain — high q_twist, chain-like d params ─────────────
+  'SIPHON': {
+    defaults: { ...C, k_amp:2, x_freq:28, y_freq:7, e_scale:5, e_offset:22,
+      d_denom:22, d_offset:7, q_base:110, q_twist:9, wave_amp:6, wave_ripple:8,
+      d_y:16, squeeze:0.45, t_div:9 },
+    sliders: [...COMMON_SLIDERS, ...ATTRACTOR_SLIDERS]
+  },
+  // ── RADIOLARIA: radial spines — high k_amp, high symmetry ────────────────
+  'RADIOLARIA': {
+    defaults: { ...C, k_amp:14, x_freq:5, y_freq:20, e_scale:18, e_offset:0,
+      d_denom:80, d_offset:2, q_base:190, q_twist:5, wave_amp:2, wave_ripple:10,
+      d_y:6, squeeze:1, t_div:22, symmetry:4 },
+    sliders: [...COMMON_SLIDERS, ...ATTRACTOR_SLIDERS]
+  },
+  // ── BIOLUME: diffuse cloud — very high wave_amp, scattered ───────────────
+  'BIOLUME': {
+    defaults: { ...C, k_amp:1.5, x_freq:35, y_freq:45, e_scale:3, e_offset:0,
+      d_denom:95, d_offset:1, q_base:220, q_twist:2, wave_amp:18, wave_ripple:2,
+      d_y:7, squeeze:0.85, t_div:24, opacity:120, glow:4 },
+    sliders: [...COMMON_SLIDERS, ...ATTRACTOR_SLIDERS]
+  },
+  // ── NAUTILOID: tight spiral — very high q_twist ───────────────────────────
+  'NAUTILOID': {
+    defaults: { ...C, k_amp:4, x_freq:10, y_freq:28, e_scale:6, e_offset:16,
+      d_denom:48, d_offset:5, q_base:120, q_twist:12, wave_amp:4, wave_ripple:6,
+      d_y:10, squeeze:0.8, t_div:14 },
+    sliders: [...COMMON_SLIDERS, ...ATTRACTOR_SLIDERS]
+  },
+  // ── XENOCORAL: branching — high y_freq, triple symmetry ──────────────────
+  'XENOCORAL': {
+    defaults: { ...C, k_amp:7, x_freq:4, y_freq:50, e_scale:12, e_offset:6,
+      d_denom:30, d_offset:4, q_base:140, q_twist:4, wave_amp:8, wave_ripple:7,
+      d_y:13, squeeze:0.65, t_div:17, symmetry:3 },
+    sliders: [...COMMON_SLIDERS, ...ATTRACTOR_SLIDERS]
+  },
+  // ── MANDELBROT: progressive pixel render ─────────────────────────────────
+  'MANDELBROT': {
+    defaults: { ...C, trail:255, points:500, opacity:200, glow:0,
+      mandel_zoom:3, mandel_cx:-0.5, mandel_cy:0, max_iter:200 },
+    sliders: [
+      ...COMMON_SLIDERS,
+      { k:'mandel_zoom', label:'ZOOM',     min:0.2, max:6,   step:0.05 },
+      { k:'mandel_cx',   label:'CENTER X', min:-2,  max:1,   step:0.01 },
+      { k:'mandel_cy',   label:'CENTER Y', min:-1.5,max:1.5, step:0.01 },
+      { k:'max_iter',    label:'DETAIL',   min:50,  max:800, step:10 },
+    ]
+  },
+  // ── JULIA: progressive pixel render ──────────────────────────────────────
+  'JULIA': {
+    defaults: { ...C, trail:255, points:500, opacity:200, glow:0,
+      julia_x:-0.7, julia_y:0.27, julia_zoom:3.5, max_iter:200 },
+    sliders: [
+      ...COMMON_SLIDERS,
+      { k:'julia_x',    label:'C REAL',   min:-2,  max:2,   step:0.005 },
+      { k:'julia_y',    label:'C IMAG',   min:-2,  max:2,   step:0.005 },
+      { k:'julia_zoom', label:'ZOOM',     min:0.5, max:8,   step:0.05 },
+      { k:'max_iter',   label:'DETAIL',   min:50,  max:800, step:10 },
+    ]
+  },
+  // ── LISSAJOUS: 3D Lissajous knot ─────────────────────────────────────────
+  'LISSAJOUS': {
+    defaults: { ...C, lissa_a:3, lissa_b:2, lissa_c:5, lissa_d:0.5,
+      q_base:180, speed:0.03, t_div:12 },
+    sliders: [
+      ...COMMON_SLIDERS,
+      { k:'lissa_a', label:'FREQ A', min:1, max:10, step:1 },
+      { k:'lissa_b', label:'FREQ B', min:1, max:10, step:1 },
+      { k:'lissa_c', label:'FREQ C', min:1, max:10, step:1 },
+      { k:'lissa_d', label:'PHASE',  min:0, max:3.14, step:0.01 },
+    ]
+  },
+  // ── CLIFFORD: strange attractor ───────────────────────────────────────────
+  'CLIFFORD': {
+    defaults: { ...C, clif_a:-1.4, clif_b:1.6, clif_c:1.0, clif_d:0.7,
+      scale:0.5, speed:0.03, t_div:20 },
+    sliders: [
+      ...COMMON_SLIDERS,
+      { k:'clif_a', label:'A', min:-3, max:3, step:0.05 },
+      { k:'clif_b', label:'B', min:-3, max:3, step:0.05 },
+      { k:'clif_c', label:'C', min:-3, max:3, step:0.05 },
+      { k:'clif_d', label:'D', min:-3, max:3, step:0.05 },
+    ]
+  },
+};
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let entities = [];
+let selectedEntity = null;
+let globalPalette = 'Biolume';
+let nextId = 0;
+let sketch = null;
+let pg = null; // P2D graphics buffer
+
+// 3D camera state
+let camRotX = 0, camRotY = 0, camRotZ = 0, camZoom = 1;
+let camVX = 0, camVY = 0, camVZ = 0;
+let autoRotate = false;              // 3D auto-rotate toggle
+let dragStartX, dragStartY;
+let isDragging = false;
+let prevTouches = [];
+let lastTapTime = 0;                 // for double-tap detection on mobile
+
+function clearPgBuffer() {
+  if (!pg) return;
+  pg.colorMode(pg.RGB, 255);
+  pg.background(5, 5, 8);
+}
+
+// ─── Entity class ─────────────────────────────────────────────────────────────
+class Entity {
+  constructor(typeId, x, y) {
+    this.id = nextId++;
+    this.typeId = typeId;
+    this.x = x; this.y = y;
+    this.vx = 0; this.vy = 0;
+    this.t = Math.random()*100;
+    this.totalRot = 0;
+    const def = TYPE_DEFS[typeId];
+    this.params = Object.assign({}, def.defaults);
+    this.paletteKey = globalPalette;
+    this.selected = false;
+    // Fractal progressive render state
+    this._fractalImg = null;
+    this._fractalRow = 0;
+    this._fractalKey = '';
+  }
+
+  boundingRadius() {
+    const p = this.params;
+    if (this.typeId === 'MANDELBROT' || this.typeId === 'JULIA') return 99999;
+    if (this.typeId === 'LISSAJOUS') return (p.q_base||180) * (p.scale||0.75) + 40;
+    if (this.typeId === 'CLIFFORD') return (p.scale||0.5) * 180 + 30;
+    return (p.q_base || 160) * (p.scale || 0.75) * 1.2 + 40;
+  }
+
+  hitTest(mx, my) {
+    return Math.hypot(mx - this.x, my - this.y) < this.boundingRadius() + 20;
+  }
+
+  update(pg) {
+    this.t += 0.01;
+    this.totalRot += (this.params.spin || 0);
+    // No automatic drift — entities stay centered where spawned
+  }
+
+  getColor(p, v, t, alpha) {
+    const pr = this.params;
+    const fn = PALETTES[this.paletteKey] || PALETTES['Biolume'];
+    const tAdj = t * (pr.color_speed !== undefined ? pr.color_speed : 1);
+    const [h, s, b] = fn(Math.max(0, Math.min(1, v)), tAdj);
+    const hShifted = ((h + (pr.hue_shift || 0)) % 360 + 360) % 360;
+    return p.color(hShifted, s, b, alpha);
+  }
+
+  draw(pg) {
+    // FRACTAL types: full-canvas render, skip translate
+    if (this.typeId === 'MANDELBROT' || this.typeId === 'JULIA') {
+      pg.push();
+      pg.colorMode(pg.HSB, 360, 100, 100, 255);
+      this.drawFractalProgressive(pg);
+      pg.pop();
+      return;
+    }
+
+    pg.push();
+    pg.translate(this.x, this.y);
+    pg.colorMode(pg.HSB, 360, 100, 100, 255);
+    pg.rotate(this.totalRot);
+
+    switch(this.typeId) {
+      case 'LISSAJOUS': this.drawLissajous(pg); break;
+      case 'CLIFFORD':  this.drawClifford(pg);  break;
+      default:          this.drawAttractor(pg);  break;
+    }
+
+    pg.pop();
+  }
+
+  // ── Unified Attractor renderer (all organism types) ───────────────────────
+  drawAttractor(pg) {
+    const pr = this.params;
+    const N = 80;
+    const t = this.t * (pr.speed || 0.05) * 100;
+    const sym = Math.floor(pr.symmetry) || 1;
+    const glowPasses = Math.min(Math.floor(pr.glow) || 0, 4);
+
+    pg.noFill();
+    pg.scale(pr.scale || 0.75);
+
+    // Two-pass rendering: glow halo + crisp core
+    const passes = glowPasses > 0
+      ? [{ sw: (pr.weight||1) + glowPasses*2.5, alpha: (pr.opacity||160)*0.08*glowPasses },
+         { sw: pr.weight||1, alpha: pr.opacity||160 }]
+      : [{ sw: pr.weight||1, alpha: pr.opacity||160 }];
+
+    for (const pass of passes) {
+      pg.strokeWeight(pass.sw);
+      for (let s = 0; s < sym; s++) {
+        pg.push();
+        pg.rotate((s / sym) * Math.PI * 2);
+        for (let i = 0; i < (pr.points || 4000); i++) {
+          const ix = i % N, iy = i / N;
+          const k = (pr.k_amp||5) * Math.cos(ix/(pr.x_freq||14)) * Math.cos(iy/(pr.y_freq||30));
+          const e = iy/(pr.e_scale||8) - (pr.e_offset||13);
+          const d = (k*k + e*e)/(pr.d_denom||59) + (pr.d_offset||4);
+          const at = Math.atan2(e, k);
+          const q = (pr.q_base||160) - (pr.q_twist||3)*Math.sin(at*e);
+          const wave = k*((pr.wave_amp||3) + (pr.wave_ripple||4)/d*Math.sin(d*d - t*2));
+          const c = d/2 + e/99 - t/(pr.t_div||18);
+          const xL = (q + wave)*Math.sin(c);
+          const yL = (q + d*(pr.d_y||9))*Math.cos(c)*(pr.squeeze||1);
+          const col = this.getColor(pg, i/(pr.points||4000), t, pass.alpha);
+          pg.stroke(col);
+          pg.point(xL, yL);
+        }
+        pg.pop();
+      }
+    }
+  }
+
+  // ── Lissajous 3D knot (point cloud) ───────────────────────────────────────
+  drawLissajous(pg) {
+    const pr = this.params;
+    const t = this.t * (pr.speed||0.03) * 100;
+    const sc = (pr.q_base||180) * (pr.scale||0.75);
+    const a = pr.lissa_a||3, b = pr.lissa_b||2, c2 = pr.lissa_c||5;
+    const ph = pr.lissa_d||0.5;
+    const N = pr.points||4000;
+
+    pg.noFill();
+    if ((pr.glow||0) > 0) {
+      pg.strokeWeight((pr.weight||1) + (pr.glow||0)*2);
+      for (let i=0; i<N; i++) {
+        const theta = (i/N)*Math.PI*6;
+        const col = this.getColor(pg, i/N, t, (pr.opacity||160)*0.07*(pr.glow||0));
+        pg.stroke(col);
+        pg.point(Math.sin(a*theta+t/(pr.t_div||12))*sc, Math.sin(b*theta+ph)*sc*0.6);
+      }
+    }
+    pg.strokeWeight(pr.weight||1);
+    for (let i=0; i<N; i++) {
+      const theta = (i/N)*Math.PI*6;
+      const tm = t/(pr.t_div||12);
+      const xL = Math.sin(a*theta + tm)*sc;
+      const yL = Math.sin(b*theta + ph)*sc*0.6 + Math.sin(c2*theta)*sc*0.25;
+      const col = this.getColor(pg, i/N, t, pr.opacity||160);
+      pg.stroke(col);
+      pg.point(xL, yL);
+    }
+  }
+
+  // ── Clifford strange attractor ─────────────────────────────────────────────
+  drawClifford(pg) {
+    const pr = this.params;
+    const t = this.t;
+    const ca=pr.clif_a||-1.4, cb=pr.clif_b||1.6, cc=pr.clif_c||1.0, cd=pr.clif_d||0.7;
+    const sc = (pr.scale||0.5)*100;
+    const N = pr.points||4000;
+
+    pg.noFill();
+    if ((pr.glow||0) > 0) {
+      pg.strokeWeight((pr.weight||1) + (pr.glow||0)*2);
+      let cx2=0.1, cy2=0.1;
+      for (let i=0; i<N+50; i++) {
+        const nx=Math.sin(ca*cy2)+cc*Math.cos(ca*cx2);
+        const ny=Math.sin(cb*cx2)+cd*Math.cos(cb*cy2);
+        cx2=nx; cy2=ny;
+        if (i<50) continue;
+        const col = this.getColor(pg, (i-50)/N, t, (pr.opacity||160)*0.07*(pr.glow||0));
+        pg.stroke(col); pg.point(cx2*sc, cy2*sc);
+      }
+    }
+    pg.strokeWeight(pr.weight||1);
+    let cx2=0.1, cy2=0.1;
+    for (let i=0; i<N+50; i++) {
+      const nx=Math.sin(ca*cy2)+cc*Math.cos(ca*cx2);
+      const ny=Math.sin(cb*cx2)+cd*Math.cos(cb*cy2);
+      cx2=nx; cy2=ny;
+      if (i<50) continue;
+      const col = this.getColor(pg, (i-50)/N, t, pr.opacity||160);
+      pg.stroke(col); pg.point(cx2*sc, cy2*sc);
+    }
+  }
+
+  // ── Progressive fractal renderer (Mandelbrot / Julia) ─────────────────────
+  drawFractalProgressive(pg) {
+    const pr = this.params;
+    const W = pg.width, H = pg.height;
+    const maxIter = Math.floor(pr.max_iter || 200);
+    const isMandel = this.typeId === 'MANDELBROT';
+
+    // Build a key to detect parameter changes → restart render
+    const zoom  = isMandel ? (pr.mandel_zoom||3) : (pr.julia_zoom||3.5);
+    const cxP   = isMandel ? (pr.mandel_cx||-0.5) : (pr.julia_x||-0.7);
+    const cyP   = isMandel ? (pr.mandel_cy||0)    : (pr.julia_y||0.27);
+    const fKey  = `${W}x${H}|${zoom}|${cxP}|${cyP}|${maxIter}|${this.paletteKey}|${pr.hue_shift||0}`;
+
+    if (fKey !== this._fractalKey) {
+      this._fractalKey = fKey;
+      this._fractalRow = 0;
+      this._fractalImg = pg.createImage(W, H);
+      this._fractalImg.loadPixels();
+      for (let j=0; j<this._fractalImg.pixels.length; j+=4) {
+        this._fractalImg.pixels[j]=5; this._fractalImg.pixels[j+1]=5;
+        this._fractalImg.pixels[j+2]=8; this._fractalImg.pixels[j+3]=255;
+      }
+      this._fractalImg.updatePixels();
+    }
+
+    // Display current state (even partial)
+    pg.image(this._fractalImg, 0, 0);
+
+    // Render next batch of rows
+    if (this._fractalRow < H) {
+      const ROWS = 4;
+      const aspect = W / H;
+      this._fractalImg.loadPixels();
+
+      for (let r=0; r<ROWS && this._fractalRow<H; r++, this._fractalRow++) {
+        for (let px=0; px<W; px++) {
+          let x0, y0, zx, zy, iter;
+          if (isMandel) {
+            x0 = (px/W - 0.5)*zoom*aspect + cxP;
+            y0 = (this._fractalRow/H - 0.5)*zoom + cyP;
+            zx=0; zy=0;
+          } else {
+            zx = (px/W - 0.5)*zoom*aspect;
+            zy = (this._fractalRow/H - 0.5)*zoom;
+            x0 = cxP; y0 = cyP;
+          }
+          iter=0;
+          while (zx*zx + zy*zy <= 4 && iter < maxIter) {
+            const zt = zx*zx - zy*zy + x0;
+            zy = 2*zx*zy + y0; zx = zt; iter++;
+          }
+          const idx = (this._fractalRow*W + px)*4;
+          if (iter >= maxIter) {
+            this._fractalImg.pixels[idx]=5; this._fractalImg.pixels[idx+1]=5;
+            this._fractalImg.pixels[idx+2]=8; this._fractalImg.pixels[idx+3]=255;
+          } else {
+            // Smooth escape-time coloring
+            const mu = iter + 1 - Math.log(Math.log(Math.sqrt(zx*zx+zy*zy)))/Math.log(2);
+            const v = Math.max(0, Math.min(1, mu/maxIter));
+            const fn = PALETTES[this.paletteKey] || PALETTES['Inferno'];
+            const [h, s, b] = fn(v, 0);
+            const hShifted = ((h + (pr.hue_shift||0)) % 360 + 360) % 360;
+            const rgb = hsbToRgb(hShifted/360, s/100, b/100);
+            this._fractalImg.pixels[idx]=rgb[0]; this._fractalImg.pixels[idx+1]=rgb[1];
+            this._fractalImg.pixels[idx+2]=rgb[2]; this._fractalImg.pixels[idx+3]=255;
+          }
+        }
+      }
+      this._fractalImg.updatePixels();
+      // Update progress bar
+      const pct = this._fractalRow / H * 100;
+      const bar = document.getElementById('render-bar');
+      bar.style.width = pct + '%';
+      if (pct >= 100) { bar.classList.remove('active'); }
+      else { bar.classList.add('active'); }
+    }
+  }
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+function buildPalDots(container, activeKey, onClick) {
+  container.innerHTML = '';
+  PAL_KEYS.forEach(key => {
+    const dot = document.createElement('div');
+    dot.className = 'pal-dot' + (key === activeKey ? ' active' : '');
+    dot.style.background = PAL_SWATCHES[key];
+    dot.title = key;
+    dot.addEventListener('click', (e) => { e.stopPropagation(); onClick(key, container); });
+    container.appendChild(dot);
+  });
+}
+
+function setActivePalDot(container, key) {
+  container.querySelectorAll('.pal-dot').forEach((d, i) => {
+    d.classList.toggle('active', PAL_KEYS[i] === key);
+  });
+}
+
+function buildControlPanel() {
+  const panel = document.getElementById('ctrl-panel');
+  const nameEl = document.getElementById('ctrl-typename');
+  const slidersEl = document.getElementById('ctrl-sliders');
+  const palRow = document.getElementById('ctrl-pal-dots');
+
+  if (!selectedEntity) {
+    panel.classList.remove('open');
+    setTimeout(() => {
+      if (sketch && pg) { const el=document.getElementById('canvas-wrap'); sketch.resizeCanvas(el.clientWidth,el.clientHeight); }
+    }, 320);
+    return;
+  }
+  panel.classList.add('open');
+  setTimeout(() => {
+    if (sketch && pg) { const el=document.getElementById('canvas-wrap'); sketch.resizeCanvas(el.clientWidth,el.clientHeight); }
+  }, 320);
+
+  nameEl.textContent = selectedEntity.typeId;
+
+  buildPalDots(palRow, selectedEntity.paletteKey, (key) => {
+    selectedEntity.paletteKey = key;
+    setActivePalDot(palRow, key);
+    // Fractal: mark dirty
+    if (selectedEntity.typeId==='MANDELBROT'||selectedEntity.typeId==='JULIA') {
+      selectedEntity._fractalKey = '';
+    }
+  });
+
+  slidersEl.innerHTML = '';
+  const def = TYPE_DEFS[selectedEntity.typeId];
+  if (!def) return;
+  def.sliders.forEach(sd => {
+    const grp = document.createElement('div');
+    grp.className = 'slider-group';
+    const lbl = document.createElement('label'); lbl.textContent = sd.label;
+    const inp = document.createElement('input');
+    inp.type='range'; inp.min=sd.min; inp.max=sd.max; inp.step=sd.step;
+    inp.value = selectedEntity.params[sd.k] !== undefined ? selectedEntity.params[sd.k] : sd.min;
+    const val = document.createElement('span'); val.className = 'slider-val';
+    const fmt = v => sd.step<0.01?parseFloat(v).toFixed(3):sd.step<0.1?parseFloat(v).toFixed(2):sd.step<1?parseFloat(v).toFixed(1):parseInt(v);
+    val.textContent = fmt(inp.value);
+    inp.addEventListener('input', () => {
+      const n = parseFloat(inp.value);
+      selectedEntity.params[sd.k] = n;
+      val.textContent = fmt(n);
+      // Fractal param changed → restart render
+      if (selectedEntity.typeId==='MANDELBROT'||selectedEntity.typeId==='JULIA') {
+        selectedEntity._fractalKey = '';
+        document.getElementById('render-bar').classList.add('active');
+      }
+    });
+    grp.appendChild(lbl); grp.appendChild(inp); grp.appendChild(val);
+    slidersEl.appendChild(grp);
+  });
+}
+
+function updateActiveTypeBtn() {
+  const typeId = selectedEntity ? selectedEntity.typeId : null;
+  document.querySelectorAll('.btn-spawn, .btn-math').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === typeId);
+  });
+}
+
+function selectEntity(e) {
+  if (selectedEntity) selectedEntity.selected = false;
+  selectedEntity = e;
+  if (selectedEntity) selectedEntity.selected = true;
+  buildControlPanel();
+  updateActiveTypeBtn();
+}
+
+function spawnEntity(typeId) {
+  const ref = pg || document.getElementById('canvas-wrap');
+  const W = ref.width || ref.clientWidth;
+  const H = ref.height || ref.clientHeight;
+  const cx = W/2;
+  const cy = H/2;
+  const e = new Entity(typeId, cx, cy);
+  entities.push(e);
+  selectEntity(e);
+  if (typeId==='MANDELBROT'||typeId==='JULIA') {
+    document.getElementById('render-bar').classList.add('active');
+  }
+}
+
+function switchCurrentEntity(typeId) {
+  if (selectedEntity) {
+    selectedEntity.typeId = typeId;
+    selectedEntity.params = Object.assign({}, TYPE_DEFS[typeId].defaults);
+    selectedEntity.totalRot = 0;
+    selectedEntity._fractalKey = '';
+    selectedEntity._fractalRow = 0;
+    selectedEntity._fractalImg = null;
+    clearPgBuffer();
+    buildControlPanel();
+    updateActiveTypeBtn();
+    if (typeId==='MANDELBROT'||typeId==='JULIA') {
+      document.getElementById('render-bar').classList.add('active');
+    }
+  } else if (entities.length === 0) {
+    spawnEntity(typeId);
+  } else {
+    selectEntity(entities[entities.length - 1]);
+    switchCurrentEntity(typeId);
+  }
+}
+
+function resetAll() {
+  entities = []; selectedEntity = null;
+  clearPgBuffer();
+  buildControlPanel();
+  const ref = pg || document.getElementById('canvas-wrap');
+  const W = ref.width || ref.clientWidth, H = ref.height || ref.clientHeight;
+  const re = new Entity('ORGANISM', W/2, H/2);
+  entities.push(re);
+  selectEntity(re);
+  autoRotate = false;
+  const btn3d = document.getElementById('btn-3d');
+  if (btn3d) { btn3d.textContent = '3D OFF'; btn3d.classList.remove('active'); }
+  camRotX=0; camRotY=0; camRotZ=0; camZoom=1; camVX=0; camVY=0; camVZ=0;
+}
+
+// ─── Build palette dots ───────────────────────────────────────────────────────
+const palDotsTop = document.getElementById('pal-dots-top');
+buildPalDots(palDotsTop, globalPalette, (key, container) => {
+  globalPalette = key;
+  setActivePalDot(container, key);
+  if (selectedEntity) {
+    selectedEntity.paletteKey = key;
+    if (selectedEntity.typeId==='MANDELBROT'||selectedEntity.typeId==='JULIA') {
+      selectedEntity._fractalKey = '';
+    }
+    setActivePalDot(document.getElementById('ctrl-pal-dots'), key);
+  }
+});
+
+// ─── Top bar buttons ──────────────────────────────────────────────────────────
+document.querySelectorAll('.btn-spawn, .btn-math').forEach(btn => {
+  btn.addEventListener('click', () => switchCurrentEntity(btn.dataset.type));
+});
+document.getElementById('btn-3d').addEventListener('click', () => {
+  autoRotate = !autoRotate;
+  const btn = document.getElementById('btn-3d');
+  btn.textContent = autoRotate ? '3D ON' : '3D OFF';
+  btn.classList.toggle('active', autoRotate);
+  if (!autoRotate) { camRotX=0; camRotY=0; camRotZ=0; camVX=0; camVY=0; camVZ=0; }
+});
+document.getElementById('btn-info').addEventListener('click', () => {
+  document.getElementById('modal-overlay').classList.add('open');
+});
+document.getElementById('modal-close').addEventListener('click', () => {
+  document.getElementById('modal-overlay').classList.remove('open');
+});
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target===document.getElementById('modal-overlay'))
+    document.getElementById('modal-overlay').classList.remove('open');
+});
+document.getElementById('btn-reset').addEventListener('click', resetAll);
+document.getElementById('ctrl-remove').addEventListener('click', () => {
+  if (!selectedEntity) return;
+  entities = entities.filter(e => e !== selectedEntity);
+  selectEntity(null);
+});
+
+// ─── p5 sketch (WebGL canvas + P2D offscreen buffer) ─────────────────────────
+sketch = new p5(function(p) {
+
+  p.setup = function() {
+    const el = document.getElementById('canvas-wrap');
+    const canvas = p.createCanvas(el.clientWidth, el.clientHeight, p.WEBGL);
+    canvas.parent('canvas-wrap');
+
+    // P2D offscreen buffer for organism rendering with trails
+    pg = p.createGraphics(el.clientWidth, el.clientHeight);
+    pg.pixelDensity(1); // keep at 1 for performance
+    pg.colorMode(pg.RGB, 255);
+    pg.background(5, 5, 8);
+    pg.colorMode(pg.HSB, 360, 100, 100, 255);
+
+    // Spawn initial organism
+    const initE = new Entity('ORGANISM', pg.width/2, pg.height/2);
+    entities.push(initE);
+    selectEntity(initE);
+  };
+
+  p.draw = function() {
+    // ── Camera inertia ─────────────────────────────────────────────────────
+    camRotX += camVX; camRotY += camVY; camRotZ += camVZ;
+    camVX *= 0.88; camVY *= 0.88; camVZ *= 0.88;
+    if (autoRotate) { camRotY += 0.003; camRotZ += 0.002; }
+    // Soft limit on tilt
+    camRotX = Math.max(-Math.PI*0.48, Math.min(Math.PI*0.48, camRotX));
+
+    // ── Render organisms to P2D buffer ─────────────────────────────────────
+    const trailAlpha = entities.reduce((mn, e) =>
+      e.params.trail !== undefined ? Math.min(mn, e.params.trail) : mn, 10);
+    pg.colorMode(pg.RGB, 255);
+    pg.noStroke(); pg.fill(5, 5, 8, trailAlpha);
+    pg.rect(0, 0, pg.width, pg.height);
+    pg.colorMode(pg.HSB, 360, 100, 100, 255);
+
+    for (const e of entities) { e.update(pg); e.draw(pg); }
+
+    // ── Display pg as textured 3D plane with perspective depth ──────────────
+    p.background(5, 5, 8);
+    p.push();
+    // Flip Y so texture renders right-side up
+    p.scale(1, -1, 1);
+    p.rotateX(camRotX);
+    p.rotateY(camRotY);
+    p.rotateZ(camRotZ);
+    // Perspective depth: scale down slightly when rotated to show compression
+    const depthScale = 1 - Math.abs(Math.sin(camRotX)) * 0.15 - Math.abs(Math.sin(camRotY)) * 0.15;
+    p.scale(camZoom * depthScale, camZoom * depthScale, camZoom * depthScale);
+    p.noStroke();
+    p.texture(pg);
+    p.plane(pg.width, pg.height);
+    p.pop();
+  };
+
+  // ── Hit test in pg-space ──────────────────────────────────────────────────
+  function handlePress(sx, sy) {
+    // Map screen coords to pg coords (approximate — accurate only when flat)
+    const wrap = document.getElementById('canvas-wrap');
+    const mx = sx * (pg.width / wrap.clientWidth);
+    const my = sy * (pg.height / wrap.clientHeight);
+    let hit = null;
+    for (let i = entities.length-1; i>=0; i--) {
+      if (entities[i].hitTest(mx, my)) { hit=entities[i]; break; }
+    }
+    if (hit) selectEntity(hit);
+    // NEVER deselect on empty tap — panel stays open
+  }
+
+  // ── Mouse controls: drag=rotate, scroll=zoom, release-without-drag=select ─
+  p.mousePressed = function() {
+    dragStartX = p.mouseX; dragStartY = p.mouseY;
+    isDragging = false;
+  };
+
+  p.mouseDragged = function() {
+    isDragging = true;
+    // No camera rotation on drag — use 3D toggle button only
+  };
+
+  p.mouseReleased = function() {
+    if (!isDragging) handlePress(dragStartX, dragStartY);
+  };
+
+  p.mouseWheel = function(e) {
+    camZoom *= Math.pow(0.999, e.delta);
+    camZoom = Math.max(0.08, Math.min(12, camZoom));
+    return false;
+  };
+
+  // ── Touch controls: 1-finger=rotate, 2-finger=pinch-zoom ─────────────────
+  p.touchStarted = function() {
+    prevTouches = p.touches.map(t2 => ({x:t2.x, y:t2.y}));
+    if (p.touches.length === 1) {
+      dragStartX = p.touches[0].x;
+      dragStartY = p.touches[0].y;
+      isDragging = false;
+    }
+    return false;
+  };
+
+  p.touchMoved = function() {
+    if (p.touches.length === 1 && prevTouches.length >= 1) {
+      const dx = p.touches[0].x - prevTouches[0].x;
+      const dy = p.touches[0].y - prevTouches[0].y;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) isDragging = true;
+      // No 1-finger rotation — flat by default
+    } else if (p.touches.length === 2 && prevTouches.length >= 2) {
+      const d1 = Math.hypot(p.touches[0].x-p.touches[1].x, p.touches[0].y-p.touches[1].y);
+      const d0 = Math.hypot(prevTouches[0].x-prevTouches[1].x, prevTouches[0].y-prevTouches[1].y);
+      if (d0 > 1) {
+        camZoom *= d1 / d0;
+        camZoom = Math.max(0.08, Math.min(12, camZoom));
+      }
+    }
+    prevTouches = p.touches.map(t2 => ({x:t2.x, y:t2.y}));
+    return false;
+  };
+
+  p.touchEnded = function() {
+    if (!isDragging && p.touches.length === 0) handlePress(dragStartX, dragStartY);
+    if (p.touches.length === 0) prevTouches = [];
+    return false;
+  };
+
+  p.doubleClicked = function() {
+    if (!selectedEntity) return;
+    const typeId = selectedEntity.typeId;
+    if (typeId !== 'MANDELBROT' && typeId !== 'JULIA') return;
+    const wrap = document.getElementById('canvas-wrap');
+    const mx = p.mouseX / wrap.clientWidth;
+    const my = p.mouseY / wrap.clientHeight;
+    const pr = selectedEntity.params;
+    const isMandel = typeId === 'MANDELBROT';
+    const zoom  = isMandel ? (pr.mandel_zoom||3) : (pr.julia_zoom||3.5);
+    const cxP   = isMandel ? (pr.mandel_cx||-0.5) : 0;
+    const cyP   = isMandel ? (pr.mandel_cy||0) : 0;
+    const aspect = pg.width / pg.height;
+    if (isMandel) {
+      selectedEntity.params.mandel_cx = (mx - 0.5) * zoom * aspect + cxP;
+      selectedEntity.params.mandel_cy = (my - 0.5) * zoom + cyP;
+      selectedEntity.params.mandel_zoom = zoom * 0.4;
+    } else {
+      selectedEntity.params.julia_zoom = zoom * 0.4;
+    }
+    selectedEntity._fractalKey = '';
+    document.getElementById('render-bar').classList.add('active');
+    buildControlPanel();
+    return false;
+  };
+
+  p.windowResized = function() {
+    const el = document.getElementById('canvas-wrap');
+    p.resizeCanvas(el.clientWidth, el.clientHeight);
+    if (pg) pg.resizeCanvas(el.clientWidth, el.clientHeight);
+  };
+
+}, 'canvas-wrap');
+</script>
+</body>
+</html>
