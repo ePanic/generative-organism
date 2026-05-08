@@ -529,105 +529,192 @@ class Entity {
     const glow = pr.glow || 2;
 
     pg.scale(sc);
-
-    // Bell (dome) - rendered as stacked circles creating a rounded shape
-    const bellRadius = 80;
-    const bellHeight = 120;
-    const bellSegments = 16;
-
     pg.noFill();
-    pg.strokeWeight((pr.weight || 1) + glow * 1.5);
 
-    // Draw bell outline with organic waves
-    for (let i = 0; i <= bellSegments; i++) {
-      const angle = (i / bellSegments) * Math.PI;
-      const xPos = Math.sin(angle) * bellRadius;
-      const yPos = Math.cos(angle) * bellHeight * 0.6;
-      const wave = Math.sin(angle * 3 + t / 30) * 8;
+    // ── Bell: Organic dome with radial structure ──────────────────────────────
+    const bellRadius = 70;
+    const bellHeight = 100;
+    const bellRings = 8; // Concentric rings for depth
+    const bellSegments = 32;
 
-      if (i === 0) {
-        pg.beginShape();
-        pg.curveVertex(xPos + wave, yPos - 60);
-      } else {
-        pg.curveVertex(xPos + wave, yPos - 60);
+    // Pulsating bell animation
+    const bellPulse = Math.sin(t / 40) * 0.15 + 1;
+
+    // Draw concentric bell rings (from outer to inner)
+    for (let ring = 0; ring < bellRings; ring++) {
+      const ringProgress = ring / bellRings; // 0 to 1 (outer to inner)
+      const ringRadius = bellRadius * (1 - ringProgress * 0.4) * bellPulse;
+      const ringHeight = bellHeight * (1 - ringProgress * 0.5);
+      const ringAlpha = opacity * (1 - ringProgress * 0.5) * (0.4 + ringProgress * 0.6);
+
+      pg.strokeWeight((pr.weight || 1) * (0.8 + ringProgress * 0.6));
+
+      pg.beginShape();
+      for (let i = 0; i <= bellSegments; i++) {
+        const angle = (i / bellSegments) * Math.PI * 2;
+
+        // Organic undulation with multiple sine waves
+        const wave1 = Math.sin(angle * 4 + t / 25) * 4;
+        const wave2 = Math.sin(angle * 8 + t / 35) * 2;
+        const verticalRipple = Math.cos(angle * 6 + t / 30) * 6 * (1 - ringProgress);
+
+        const xPos = Math.cos(angle) * ringRadius + wave1 + wave2;
+        const yPos = -ringHeight * 0.8 + verticalRipple;
+
+        const col = this.getColor(pg, (ringProgress + t/300) % 1, t, ringAlpha);
+        pg.stroke(col);
+        pg.curveVertex(xPos, yPos);
       }
-    }
-    pg.endShape();
-
-    // Bioluminescent spots on bell
-    const spotCount = 12;
-    for (let i = 0; i < spotCount; i++) {
-      const angle = (i / spotCount) * Math.PI * 2;
-      const distFromTop = 20 + Math.sin(t / 20 + i) * 15;
-      const xSpot = Math.sin(angle) * (bellRadius * 0.7);
-      const ySpot = -(bellHeight * 0.3) + distFromTop;
-
-      const spotGlow = Math.sin(t / 15 + i) * 0.5 + 0.5;
-      const spotColor = this.getColor(pg, (i / spotCount + t/200) % 1, t, opacity * 0.6 * spotGlow);
-
-      pg.stroke(spotColor);
-      pg.strokeWeight((pr.weight || 1) * 2);
-      pg.point(xSpot, ySpot);
-
-      // Glow ring
-      if (glow > 0) {
-        pg.strokeWeight(pr.weight || 1);
-        const glowColor = this.getColor(pg, (i / spotCount + t/200) % 1, t, opacity * 0.15 * spotGlow);
-        pg.stroke(glowColor);
-        for (let g = 0; g < 3; g++) {
-          pg.point(xSpot + Math.cos(g * Math.PI * 2 / 3) * 4, ySpot + Math.sin(g * Math.PI * 2 / 3) * 4);
-        }
-      }
+      pg.endShape();
     }
 
-    // Tentacles - long flowing strands
-    const tentacleCount = 8;
-    const pointsPerTentacle = 40;
-    const maxTentacleLength = 200;
+    // ── Bioluminescent bands and spots ────────────────────────────────────────
+    const biolumRings = 5;
+    for (let b = 0; b < biolumRings; b++) {
+      const bandHeight = -bellHeight * 0.2 - (b * bellHeight * 0.12);
+      const bandIntensity = Math.sin(t / 20 + b * 0.5) * 0.4 + 0.6;
+
+      pg.strokeWeight((pr.weight || 1) * 1.5);
+      pg.beginShape();
+      for (let i = 0; i <= bellSegments; i++) {
+        const angle = (i / bellSegments) * Math.PI * 2;
+        const xSpot = Math.cos(angle) * bellRadius * (0.8 - b * 0.1);
+        const ySpot = bandHeight + Math.sin(angle * 3) * 3;
+
+        const col = this.getColor(pg, (b / biolumRings + t/200) % 1, t,
+          opacity * 0.5 * bandIntensity);
+        pg.stroke(col);
+        pg.curveVertex(xSpot, ySpot);
+      }
+      pg.endShape();
+    }
+
+    // ── Radial ribs for bell structure ─────────────────────────────────────────
+    const ribCount = 16;
+    pg.strokeWeight((pr.weight || 1) * 0.7);
+    for (let r = 0; r < ribCount; r++) {
+      const angle = (r / ribCount) * Math.PI * 2;
+      const cos_a = Math.cos(angle);
+      const sin_a = Math.sin(angle);
+
+      const ribAlpha = opacity * 0.3;
+      const col = this.getColor(pg, (r / ribCount + t/400) % 1, t, ribAlpha);
+      pg.stroke(col);
+
+      pg.beginShape();
+      for (let segment = 0; segment <= 12; segment++) {
+        const segProgress = segment / 12;
+        const ribRadius = bellRadius * (1 - segProgress * 0.3) * bellPulse;
+        const ribHeight = -bellHeight * 0.8 * segProgress;
+        const curve = Math.sin(angle * 2 + t / 40) * 3 * (1 - segProgress);
+
+        const xRib = cos_a * ribRadius + curve;
+        const yRib = ribHeight;
+        pg.curveVertex(xRib, yRib);
+      }
+      pg.endShape();
+    }
+
+    // ── Tentacles: Many flowing strands with natural physics ──────────────────
+    const tentacleCount = 48; // Many tentacles like real jellyfish
+    const pointsPerTentacle = 60;
+    const maxTentacleLength = 240;
+    const tentacleBaseRadius = bellRadius * 0.75;
+
+    pg.strokeWeight(pr.weight || 1);
 
     for (let t_idx = 0; t_idx < tentacleCount; t_idx++) {
       const tentacleAngle = (t_idx / tentacleCount) * Math.PI * 2;
-      const startX = Math.sin(tentacleAngle) * (bellRadius * 0.8);
-      const startY = 50;
+      const cos_ta = Math.cos(tentacleAngle);
+      const sin_ta = Math.sin(tentacleAngle);
 
-      pg.strokeWeight(pr.weight || 1);
+      // Tentacle start position (around bell base)
+      const bellBaseY = bellHeight * 0.6;
+      const startX = sin_ta * tentacleBaseRadius;
+      const startY = bellBaseY;
+
       pg.beginShape();
 
       for (let p = 0; p < pointsPerTentacle; p++) {
-        const progress = p / pointsPerTentacle;
-        const curveOffset = Math.sin(tentacleAngle * 2 + t / 25) * 20 * (1 - progress);
-        const undulate = Math.sin(p / 5 + t / 30) * 8 * progress;
-        const taper = 1 - progress * 0.8;
+        const progress = p / pointsPerTentacle; // 0 to 1 (tip to root)
 
-        const xTent = startX + curveOffset + undulate;
-        const yTent = startY + progress * maxTentacleLength * taper;
+        // Natural tentacle tapering
+        const taper = Math.pow(1 - progress * 0.7, 2); // Quadratic taper
 
-        // Color gradient along tentacle - fade to semi-transparent
-        const col = this.getColor(pg, (t_idx / tentacleCount + progress + t/200) % 1, t, opacity * (1 - progress * 0.7));
+        // Subtle lateral wave motion
+        const lateralWave = Math.sin(tentacleAngle * 3 + t / 22) * 15 * (1 - progress * 0.6);
+
+        // Longitudinal undulation - makes tentacle flow and ripple
+        const undulationWave = Math.sin(p / 8 + t / 25 + tentacleAngle * 2) *
+          12 * progress * (1 - progress);
+
+        // Gravity-like sag (tentacles curve downward slightly)
+        const sag = Math.pow(progress, 1.5) * 40;
+
+        const xTent = startX + lateralWave + undulationWave;
+        const yTent = startY + progress * maxTentacleLength * taper + sag;
+
+        // Color transition: bright at base, fades along length with bioluminescence
+        const colorProgress = (t_idx / tentacleCount + progress * 0.5 + t/250) % 1;
+        const tentacleAlpha = opacity * (1 - progress * 0.8) * (0.6 + Math.sin(t/30 + p) * 0.2);
+
+        const col = this.getColor(pg, colorProgress, t, tentacleAlpha);
         pg.stroke(col);
         pg.point(xTent, yTent);
       }
       pg.endShape();
     }
 
-    // Inner bell glow - soft light effect
-    if (glow > 0) {
-      pg.strokeWeight((pr.weight || 1) + glow * 2.5);
-      for (let i = 0; i <= bellSegments; i++) {
-        const angle = (i / bellSegments) * Math.PI;
-        const xPos = Math.sin(angle) * bellRadius * 0.9;
-        const yPos = Math.cos(angle) * bellHeight * 0.6 * 0.8;
-        const wave = Math.sin(angle * 3 + t / 30) * 6;
+    // ── Tentacle glow halos (bioluminescence) ──────────────────────────────────
+    if (glow > 1) {
+      pg.strokeWeight((pr.weight || 1) * 2.5);
+      for (let t_idx = 0; t_idx < tentacleCount; t_idx += 4) { // Sample every 4th tentacle
+        const tentacleAngle = (t_idx / tentacleCount) * Math.PI * 2;
+        const cos_ta = Math.cos(tentacleAngle);
+        const sin_ta = Math.sin(tentacleAngle);
 
-        if (i === 0) {
-          pg.beginShape();
-          pg.curveVertex(xPos + wave, yPos - 50);
-        } else {
-          pg.curveVertex(xPos + wave, yPos - 50);
+        const startX = sin_ta * tentacleBaseRadius;
+        const startY = bellHeight * 0.6;
+
+        pg.beginShape();
+        for (let p = 0; p < pointsPerTentacle; p += 4) {
+          const progress = p / pointsPerTentacle;
+          const taper = Math.pow(1 - progress * 0.7, 2);
+
+          const lateralWave = Math.sin(tentacleAngle * 3 + t / 22) * 15 * (1 - progress * 0.6);
+          const undulationWave = Math.sin(p / 8 + t / 25 + tentacleAngle * 2) *
+            12 * progress * (1 - progress);
+          const sag = Math.pow(progress, 1.5) * 40;
+
+          const xTent = startX + lateralWave + undulationWave;
+          const yTent = startY + progress * maxTentacleLength * taper + sag;
+
+          const colorProgress = (t_idx / tentacleCount + progress * 0.5 + t/250) % 1;
+          const glowAlpha = opacity * 0.25 * glow * (1 - progress * 0.8);
+
+          const col = this.getColor(pg, colorProgress, t, glowAlpha);
+          pg.stroke(col);
+          pg.curveVertex(xTent, yTent);
         }
+        pg.endShape();
       }
-      const glowCol = this.getColor(pg, 0.5, t, opacity * 0.1 * glow);
-      pg.stroke(glowCol);
+    }
+
+    // ── Central bell glow core (brightens at center) ──────────────────────────
+    if (glow > 0) {
+      pg.strokeWeight((pr.weight || 1) + glow * 1.5);
+      const coreAlpha = opacity * 0.15 * glow;
+
+      pg.beginShape();
+      for (let i = 0; i <= bellSegments / 2; i++) {
+        const angle = (i / (bellSegments / 2)) * Math.PI * 2;
+        const xCore = Math.cos(angle) * bellRadius * 0.4;
+        const yCore = -bellHeight * 0.3 + Math.sin(angle * 3) * 2;
+
+        const col = this.getColor(pg, 0.6 + Math.sin(angle) * 0.2, t, coreAlpha);
+        pg.stroke(col);
+        pg.curveVertex(xCore, yCore);
+      }
       pg.endShape();
     }
   }
