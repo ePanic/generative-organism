@@ -469,6 +469,7 @@ class Entity {
     pg.rotate(this.totalRot);
 
     switch(this.typeId) {
+      case 'MEDUSA-X':  this.drawMedusaX(pg);   break;
       case 'LISSAJOUS': this.drawLissajous(pg); break;
       case 'CLIFFORD':  this.drawClifford(pg);  break;
       default:          this.drawAttractor(pg);  break;
@@ -516,6 +517,118 @@ class Entity {
         }
         pg.pop();
       }
+    }
+  }
+
+  // ── MEDUSA-X: Realistic jellyfish with bell and tentacles ──────────────────
+  drawMedusaX(pg) {
+    const pr = this.params;
+    const t = this.t * (pr.speed || 0.04) * 100;
+    const sc = (pr.scale || 0.75);
+    const opacity = pr.opacity || 120;
+    const glow = pr.glow || 2;
+
+    pg.scale(sc);
+
+    // Bell (dome) - rendered as stacked circles creating a rounded shape
+    const bellRadius = 80;
+    const bellHeight = 120;
+    const bellSegments = 16;
+
+    pg.noFill();
+    pg.strokeWeight((pr.weight || 1) + glow * 1.5);
+
+    // Draw bell outline with organic waves
+    for (let i = 0; i <= bellSegments; i++) {
+      const angle = (i / bellSegments) * Math.PI;
+      const xPos = Math.sin(angle) * bellRadius;
+      const yPos = Math.cos(angle) * bellHeight * 0.6;
+      const wave = Math.sin(angle * 3 + t / 30) * 8;
+
+      if (i === 0) {
+        pg.beginShape();
+        pg.curveVertex(xPos + wave, yPos - 60);
+      } else {
+        pg.curveVertex(xPos + wave, yPos - 60);
+      }
+    }
+    pg.endShape();
+
+    // Bioluminescent spots on bell
+    const spotCount = 12;
+    for (let i = 0; i < spotCount; i++) {
+      const angle = (i / spotCount) * Math.PI * 2;
+      const distFromTop = 20 + Math.sin(t / 20 + i) * 15;
+      const xSpot = Math.sin(angle) * (bellRadius * 0.7);
+      const ySpot = -(bellHeight * 0.3) + distFromTop;
+
+      const spotGlow = Math.sin(t / 15 + i) * 0.5 + 0.5;
+      const spotColor = this.getColor(pg, (i / spotCount + t/200) % 1, t, opacity * 0.6 * spotGlow);
+
+      pg.stroke(spotColor);
+      pg.strokeWeight((pr.weight || 1) * 2);
+      pg.point(xSpot, ySpot);
+
+      // Glow ring
+      if (glow > 0) {
+        pg.strokeWeight(pr.weight || 1);
+        const glowColor = this.getColor(pg, (i / spotCount + t/200) % 1, t, opacity * 0.15 * spotGlow);
+        pg.stroke(glowColor);
+        for (let g = 0; g < 3; g++) {
+          pg.point(xSpot + Math.cos(g * Math.PI * 2 / 3) * 4, ySpot + Math.sin(g * Math.PI * 2 / 3) * 4);
+        }
+      }
+    }
+
+    // Tentacles - long flowing strands
+    const tentacleCount = 8;
+    const pointsPerTentacle = 40;
+    const maxTentacleLength = 200;
+
+    for (let t_idx = 0; t_idx < tentacleCount; t_idx++) {
+      const tentacleAngle = (t_idx / tentacleCount) * Math.PI * 2;
+      const startX = Math.sin(tentacleAngle) * (bellRadius * 0.8);
+      const startY = 50;
+
+      pg.strokeWeight(pr.weight || 1);
+      pg.beginShape();
+
+      for (let p = 0; p < pointsPerTentacle; p++) {
+        const progress = p / pointsPerTentacle;
+        const curveOffset = Math.sin(tentacleAngle * 2 + t / 25) * 20 * (1 - progress);
+        const undulate = Math.sin(p / 5 + t / 30) * 8 * progress;
+        const taper = 1 - progress * 0.8;
+
+        const xTent = startX + curveOffset + undulate;
+        const yTent = startY + progress * maxTentacleLength * taper;
+
+        // Color gradient along tentacle - fade to semi-transparent
+        const col = this.getColor(pg, (t_idx / tentacleCount + progress + t/200) % 1, t, opacity * (1 - progress * 0.7));
+        pg.stroke(col);
+        pg.point(xTent, yTent);
+      }
+      pg.endShape();
+    }
+
+    // Inner bell glow - soft light effect
+    if (glow > 0) {
+      pg.strokeWeight((pr.weight || 1) + glow * 2.5);
+      for (let i = 0; i <= bellSegments; i++) {
+        const angle = (i / bellSegments) * Math.PI;
+        const xPos = Math.sin(angle) * bellRadius * 0.9;
+        const yPos = Math.cos(angle) * bellHeight * 0.6 * 0.8;
+        const wave = Math.sin(angle * 3 + t / 30) * 6;
+
+        if (i === 0) {
+          pg.beginShape();
+          pg.curveVertex(xPos + wave, yPos - 50);
+        } else {
+          pg.curveVertex(xPos + wave, yPos - 50);
+        }
+      }
+      const glowCol = this.getColor(pg, 0.5, t, opacity * 0.1 * glow);
+      pg.stroke(glowCol);
+      pg.endShape();
     }
   }
 
